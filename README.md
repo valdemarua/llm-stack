@@ -41,13 +41,58 @@ Cloud models can be added separately through the UI. Model weights are not downl
 ## Dokploy
 
 1. Create a Docker Compose application (not Docker Stack) from this repository, using branch `master` and path `./docker-compose.yml`.
-2. Set the three required secrets in the Environment UI.
+2. Copy the complete environment block below into the Environment UI and generate the three required secrets.
 3. Enable **Isolated Deployments** in the Compose settings. Dokploy creates a project-specific network and attaches Traefik to it. Keep the explicit backend network; do not attach PostgreSQL or Ollama to the shared `dokploy-network`.
 4. Create a DNS record pointing your chosen hostname to the server. In **Domains → Add Domain**, select service `litellm`, host (for example `llm.example.com`), path `/`, container port `4000`, HTTPS enabled, and Let's Encrypt as certificate provider. Do not configure Advanced → Ports.
 5. Use **Preview Compose** to verify network membership, routing to LiteLLM port 4000, no published PostgreSQL/Ollama ports and loopback-only LiteLLM host binding. Deploy or redeploy after domain changes.
 6. Pull models using the Ollama container terminal, then visit `https://llm.example.com/ui`. The application API base URL is `https://llm.example.com/v1`.
 
 See [Dokploy Domains](https://docs.dokploy.com/docs/core/docker-compose/domains) and [Isolated Deployments](https://docs.dokploy.com/docs/core/docker-compose/utilities).
+
+### Environment variables
+
+Copy this entire block into **Dokploy → Environment**. Fill in the three empty required secrets before deployment. All other values are optional defaults.
+
+```dotenv
+POSTGRES_PASSWORD=
+LITELLM_MASTER_KEY=
+LITELLM_SALT_KEY=
+
+LITELLM_PORT=4000
+
+OLLAMA_NUM_PARALLEL=1
+OLLAMA_MAX_LOADED_MODELS=1
+
+OLLAMA_CPUS=0
+OLLAMA_MEMORY=0
+
+LITELLM_CPUS=0
+LITELLM_MEMORY=0
+```
+
+#### Generate secrets
+
+Run each command independently in your terminal and paste its output into the matching environment variable.
+
+**POSTGRES_PASSWORD**
+
+```sh
+openssl rand -hex 32
+```
+
+**LITELLM_MASTER_KEY**
+
+```sh
+printf 'sk-%s\n' "$(openssl rand -hex 32)"
+```
+
+**LITELLM_SALT_KEY**
+
+```sh
+openssl rand -hex 32
+```
+
+Keep these secrets stable across redeployments and store them securely. Never commit populated environment files. The host port variable does not change the internal LiteLLM port (4000) used by Dokploy domain routing.
 
 ## Resource limits
 
