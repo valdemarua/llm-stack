@@ -72,24 +72,16 @@ LITELLM_MEMORY=0
 
 #### Generate secrets
 
-Run each command independently in your terminal and paste its output into the matching environment variable.
-
-**POSTGRES_PASSWORD**
+**POSTGRES_PASSWORD and LITELLM_SALT_KEY** — run this command twice, generating an independent value for each variable:
 
 ```sh
 openssl rand -hex 32
 ```
 
-**LITELLM_MASTER_KEY**
+**LITELLM_MASTER_KEY** — generate a key with the LiteLLM `sk-` prefix:
 
 ```sh
 printf 'sk-%s\n' "$(openssl rand -hex 32)"
-```
-
-**LITELLM_SALT_KEY**
-
-```sh
-openssl rand -hex 32
 ```
 
 Keep these secrets stable across redeployments and store them securely. Never commit populated environment files. The host port variable does not change the internal LiteLLM port (4000) used by Dokploy domain routing.
