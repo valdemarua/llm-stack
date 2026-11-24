@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:17.7
+    image: postgres:18.7
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -11,7 +11,7 @@ services:
       POSTGRES_DB: litellm
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
       interval: 10s
@@ -40,7 +40,7 @@ services:
   litellm:
     cpus: "${LITELLM_CPUS:-0}"
     mem_limit: "${LITELLM_MEMORY:-0}"
-    image: docker.litellm.ai/berriai/litellm:1.108.15
+    image: litellm/litellm-database:v1.110.3
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
