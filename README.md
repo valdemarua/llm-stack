@@ -49,6 +49,28 @@ Cloud models can be added separately through the UI. Model weights are not downl
 
 See [Dokploy Domains](https://docs.dokploy.com/docs/core/docker-compose/domains) and [Isolated Deployments](https://docs.dokploy.com/docs/core/docker-compose/utilities).
 
+## Resource limits
+
+Optional limits can be configured in the local .env file or Dokploy Environment UI. All default to `0` (unlimited).
+
+| Variable | Default | Example values |
+| --- | --- | --- |
+| OLLAMA_CPUS | 0 | 2, 4, 8 |
+| OLLAMA_MEMORY | 0 | 20g, 30g, 40g |
+| LITELLM_CPUS | 0 | 0.5, 1, 2 |
+| LITELLM_MEMORY | 0 | 512m, 2g, 4g |
+
+For example:
+
+```dotenv
+OLLAMA_CPUS=8
+OLLAMA_MEMORY=40g
+LITELLM_CPUS=2
+LITELLM_MEMORY=4g
+```
+
+CPU values represent logical CPU capacity; fractional values are supported. Memory uses Docker size suffixes (e.g. `m` and `g`). These are illustrative limits, not minimum requirements or reserved resources. PostgreSQL has no explicit container resource limits. Leave enough capacity for the host and other services. A memory limit below the model's requirements may cause an OOM kill; CPU limits can reduce inference throughput. Recreate the affected containers after changing limits (redeploy in Dokploy).
+
 ## Backup and restore
 
 Configure scheduled PostgreSQL backups in Dokploy's Compose Backups UI, targeting service postgres and database litellm, or run:
