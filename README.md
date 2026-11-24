@@ -4,7 +4,7 @@ A self-hosted LLM stack with a unified OpenAI-compatible API, local model infere
 
 ## Architecture
 
-Applications → LiteLLM → Ollama or cloud providers
+![LLM Stack architecture](docs/architecture.svg)
 
 PostgreSQL stores gateway state, virtual keys, users and model configuration. All three services run in one Compose project.
 
