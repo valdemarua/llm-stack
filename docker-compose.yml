@@ -40,7 +40,9 @@ services:
   litellm:
     cpus: "${LITELLM_CPUS:-0}"
     mem_limit: "${LITELLM_MEMORY:-0}"
-    image: litellm/litellm-database:v1.110.3
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
