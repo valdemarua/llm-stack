@@ -22,21 +22,92 @@ Generate three independent secrets using `openssl rand -hex 32`. Set POSTGRES_PA
 docker compose config --quiet
 docker compose up -d
 docker compose ps
-docker compose exec ollama ollama pull qwen3:4b
+bash bin/models add qwen3:4b
 ```
 
 Open http://localhost:4000/ui. Use the default admin login and master key (see [LiteLLM UI documentation](https://docs.litellm.ai/docs/proxy/ui)).
 
-Register an Ollama chat model with alias content-fast, provider model ollama_chat/qwen3:4b and API base http://ollama:11434. Create a virtual API key restricted to the alias. Set LLM_API_KEY in your shell to that key.
+Create a virtual API key restricted to qwen3:4b. Set LLM_API_KEY in your shell to that key.
 
 ```sh
 curl http://localhost:4000/v1/chat/completions \
   -H "Authorization: Bearer $LLM_API_KEY" \
   -H 'Content-Type: application/json' \
-  -d '{"model":"content-fast","messages":[{"role":"user","content":"Write a short movie review title."}]}'
+  -d '{"model":"qwen3:4b","messages":[{"role":"user","content":"Write a short movie review title."}]}'
 ```
 
 Cloud models can be added separately through the UI. Model weights are not downloaded automatically.
+
+## Model management
+
+The optional Bash CLI combines Ollama downloads and LiteLLM registration. It requires Docker Compose v2 and jq on the host; no native Ollama installation or extra container is needed.
+
+```sh
+chmod +x bin/models
+bin/models list
+bin/models add qwen3:4b
+bin/models remove qwen3:4b
+bin/models --help
+```
+
+Example output (illustrative):
+
+```text
+LLM Stack · Models
+MODEL                                OLLAMA                 LITELLM
+qwen3:4b                             Installed              Registered
+qwen3:8b                             Installed              Missing
+```
+
+The CLI checks Docker availability, running containers and the authenticated gateway inventory. Add uses explicit tags and registers chat models with their original names. Retrying add repairs a missing registration. Remove requires confirmation and refuses known aliases, duplicate routes or ambiguous registrations. Run management operations serially; do not edit routes concurrently in the UI. Custom providers and aliases should be managed manually. Set NO_COLOR=1 to disable terminal colors.
+
+### Dokploy host usage
+
+Run from a checkout on the Docker host, not inside the Ollama container. Find the deployed project name with:
+
+```sh
+docker ps --format '{{.Label "com.docker.compose.project"}} {{.Names}}'
+COMPOSE_PROJECT_NAME=your-project bash bin/models list
+COMPOSE_PROJECT_NAME=your-project bash bin/models add qwen3:4b
+```
+
+The CLI uses the running LiteLLM container's Python runtime and master key, without copying secrets to the host or exposing Ollama. Docker access is privileged. The CLI is not a remote API client.
+
+### Manual model management
+
+Browse the [Ollama library](https://ollama.com/library). List downloaded models or pull a new one:
+
+```sh
+docker compose exec ollama ollama list
+docker compose exec ollama ollama pull qwen3:4b
+```
+
+On Dokploy, run the equivalent Ollama commands in its container terminal. In LiteLLM /ui, add a model with:
+
+| Field | Value |
+| --- | --- |
+| Public model name | qwen3:4b |
+| Provider model | ollama_chat/qwen3:4b |
+| API base | http://ollama:11434 |
+
+Use the same pattern for other chat models. Embeddings and custom aliases require their own configuration. A download alone does not register a model. To remove a model, first remove all referencing LiteLLM routes, then run:
+
+```sh
+docker compose exec ollama ollama rm qwen3:4b
+```
+
+See [LiteLLM Ollama provider](https://docs.litellm.ai/docs/providers/ollama) and [LiteLLM management API](https://docs.litellm.ai/docs/proxy/model_management).
+
+### Model discovery API
+
+Applications can populate model selectors using their scoped virtual key:
+
+```sh
+curl --fail http://localhost:4000/v1/models \
+  -H "Authorization: Bearer $LLM_API_KEY"
+```
+
+Use each returned data item's id for requests. This lists gateway models available to the key, not the entire Ollama library.
 
 ## Dokploy
 
@@ -45,7 +116,7 @@ Cloud models can be added separately through the UI. Model weights are not downl
 3. Enable **Isolated Deployments** in the Compose settings. Dokploy creates a project-specific network and attaches Traefik to it. Keep the explicit backend network; do not attach PostgreSQL or Ollama to the shared `dokploy-network`.
 4. Create a DNS record pointing your chosen hostname to the server. In **Domains → Add Domain**, select service `litellm`, host (for example `llm.example.com`), path `/`, container port `4000`, HTTPS enabled, and Let's Encrypt as certificate provider. Do not configure Advanced → Ports.
 5. Use **Preview Compose** to verify network membership, routing to LiteLLM port 4000, no published PostgreSQL/Ollama ports and loopback-only LiteLLM host binding. Deploy or redeploy after domain changes.
-6. Pull models using the Ollama container terminal, then visit `https://llm.example.com/ui`. The application API base URL is `https://llm.example.com/v1`.
+6. Add models using the CLI on the deployment host or the manual workflow below, then visit `https://llm.example.com/ui`. The application API base URL is `https://llm.example.com/v1`.
 
 See [Dokploy Domains](https://docs.dokploy.com/docs/core/docker-compose/domains) and [Isolated Deployments](https://docs.dokploy.com/docs/core/docker-compose/utilities).
 
