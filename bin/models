@@ -12,8 +12,9 @@ Usage: bin/models COMMAND [OPTIONS]
 
   list                Show installed models and gateway registrations
   search [QUERY]      Browse selected developers in Ollama's public catalog
-  search --all        Expand search across known model families
-  tags MODEL          Show downloadable tags and file sizes
+  tags MODEL          Show standard tags and download sizes
+  tags MODEL --all    Show all local variants
+  tags MODEL:TAG      Filter variants by tag prefix
   add MODEL:TAG       Download and register a chat model
   remove MODEL:TAG    Unregister and delete after confirmation
   doctor              Probe internal APIs without changing state

@@ -1,5 +1,6 @@
 """Read-only discovery from the public Ollama library."""
 import json
+import os
 import re
 import sys
 import time
@@ -55,16 +56,24 @@ def library_path(href):
 
 def table(headers, rows):
     widths = [max(len(h), *(len(row[i]) for row in rows)) for i, h in enumerate(headers)]
-    for row in [headers, *rows]:
-        print("  ".join(value.ljust(width) for value, width in zip(row, widths)).rstrip())
+    color = sys.stdout.isatty() and "NO_COLOR" not in os.environ
+    for index, row in enumerate([headers, *rows]):
+        cells = []
+        for i, (value, width) in enumerate(zip(row, widths)):
+            cell = value.ljust(width)
+            if color and (index == 0 or headers[i] in ("MODEL", "MODEL TAG")):
+                cell = ("\033[36m" if index == 0 else "\033[32m") + cell + "\033[0m"
+            cells.append(cell)
+        print("  ".join(cells).rstrip())
 
-def search(query, all_models):
+def search(query):
     catalog = json.loads(Path(__file__).with_name("catalog.json").read_text())
     results = {}
     deadline = time.monotonic() + 30
     print("Fetching Ollama catalog...", file=sys.stderr, flush=True)
-    # Query each known prefix for the expanded view; never crawl every tag page.
-    terms = sorted({p for prefixes in catalog.values() for p in prefixes}) if all_models else [query or ""]
+    # Browse each known family when no query is supplied.
+    terms = [query] if query else sorted({p for prefixes in catalog.values() for p in prefixes})
+    cloud_matches = set()
     incomplete = False
     for term in terms:
         try:
@@ -83,23 +92,27 @@ def search(query, all_models):
             if query and query.lower() not in name.lower():
                 continue
             if re.search(r"\bcloud\b", label) and not re.search(r"\b(?:e?\d+(?:\.\d+)?b)\b", label, re.I):
+                cloud_matches.add(name)
                 continue
             for vendor, prefixes in catalog.items():
                 if any(name.lower().startswith(p) for p in prefixes):
-                    sizes = ", ".join(dict.fromkeys(re.findall(r"\b(?:e?\d+(?:\.\d+)?b)\b", label, re.I)))
+                    sizes = ", ".join(dict.fromkeys(s.lower() for s in re.findall(r"\b(?:e?\d+(?:\.\d+)?b)\b", label, re.I)))
                     results[name] = (vendor, name, sizes or "—")
                     break
     if results:
         table(("DEVELOPER", "MODEL", "PARAMETERS (approx.)"), sorted(results.values()))
+        print(f"{len(results)} models found.")
+    elif cloud_matches:
+        print("No local matches; cloud-only candidates were excluded.")
     else:
         print("No matching models in returned catalog pages.")
-    print("Note: public search results are limited; completeness and local availability are not guaranteed.", file=sys.stderr)
     if incomplete:
         raise RuntimeError("Partial catalog results; narrow the search.")
 
-def tags(model):
-    if not re.fullmatch(NAME, model):
-        raise RuntimeError("Use a library model name without a tag, e.g. qwen3.")
+def tags(model, all_tags=False):
+    model, separator, prefix = model.partition(":")
+    if not re.fullmatch(NAME, model) or (separator and not re.fullmatch(NAME, prefix)):
+        raise RuntimeError("Use a model name or tag prefix, e.g. qwen3 or qwen3:4b.")
     print("Fetching Ollama tags...", file=sys.stderr, flush=True)
     rows = {}
     for href, label in fetch("/library/" + model + "/tags", time.monotonic() + 30):
@@ -114,4 +127,24 @@ def tags(model):
             rows[name] = (name, size[0] if size else "—")
     if not rows:
         raise RuntimeError("No local tags found; check the model name or catalog layout.")
-    table(("MODEL TAG", "DOWNLOAD SIZE"), list(rows.values()))
+    if separator:
+        rows = {name: row for name, row in rows.items()
+                if name.split(":", 1)[1] == prefix
+                or name.split(":", 1)[1].startswith(prefix + "-")}
+        if not rows:
+            print("No matching local tags.")
+            return
+    total = len(rows)
+    selected = list(rows.values())
+    if not all_tags and not separator:
+        short = [row for row in selected if re.fullmatch(
+            r"latest|\d+(?:\.\d+)?[bm]", row[0].split(":", 1)[1], re.I)]
+        if short:
+            selected = short
+        else:
+            selected = selected[:20]
+            print("No standard short tags; showing up to 20 catalog entries.")
+    table(("MODEL TAG", "DOWNLOAD SIZE"), selected)
+    print(f"{len(selected)} of {total} matching local tags shown.")
+    if len(selected) < total:
+        print("Use --all to show additional variants.")

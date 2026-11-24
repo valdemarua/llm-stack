@@ -158,11 +158,11 @@ def main():
     parser = argparse.ArgumentParser(prog="bin/models", description="Discover, install and manage local Ollama chat models.", epilog="Examples: bin/models search qwen; bin/models tags qwen3; bin/models add qwen3:4b")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list", help="Show installed models and gateway registrations")
-    search = commands.add_parser("search", help="Browse selected developers in the public Ollama catalog", description="Browse public search results for selected model developers. --all queries known family prefixes for broader coverage.")
+    search = commands.add_parser("search", help="Browse selected developers in the public Ollama catalog", description="Browse known families of selected developers. Public HTML results may be incomplete; local availability and parameter counts are approximate.")
     search.add_argument("query", nargs="?", help="Filter by model name")
-    search.add_argument("--all", action="store_true", help="Expand search across known families, not the entire Ollama registry")
     tags = commands.add_parser("tags", help="Show downloadable model tags and file sizes")
-    tags.add_argument("family", help="Library model name, e.g. qwen3")
+    tags.add_argument("family", help="Library model or tag prefix, e.g. qwen3 or qwen3:4b")
+    tags.add_argument("--all", action="store_true", help="Show all returned local variants instead of standard short tags")
     commands.add_parser("doctor", help="Probe internal APIs without changing state")
     for command in ("add", "remove"):
         commands.add_parser(command, help={"add": "Download and register an explicit chat model tag", "remove": "Unregister and delete a model after confirmation"}[command]).add_argument("model", help="Explicit tag, e.g. qwen3:4b")
@@ -171,9 +171,9 @@ def main():
         return
     args = parser.parse_args()
     if args.command == "search":
-        return model_catalog.search(args.query, args.all)
+        return model_catalog.search(args.query)
     if args.command == "tags":
-        return model_catalog.tags(args.family)
+        return model_catalog.tags(args.family, args.all)
     if args.command == "doctor":
         sys.exit(doctor())
     name = getattr(args, "model", None)
