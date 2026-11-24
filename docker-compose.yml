@@ -18,6 +18,8 @@ services:
       timeout: 5s
       retries: 10
   ollama:
+    cpus: "${OLLAMA_CPUS:-0}"
+    mem_limit: "${OLLAMA_MEMORY:-0}"
     image: ollama/ollama:0.40.18
     restart: unless-stopped
     security_opt:
@@ -36,6 +38,8 @@ services:
       timeout: 10s
       retries: 10
   litellm:
+    cpus: "${LITELLM_CPUS:-0}"
+    mem_limit: "${LITELLM_MEMORY:-0}"
     image: docker.litellm.ai/berriai/litellm:1.108.15
     restart: unless-stopped
     security_opt:
