@@ -1,115 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set +x
-unset CDPATH
-green='' red='' yellow='' reset=''
-if [[ -t 1 && -z ${NO_COLOR+x} && ${TERM:-dumb} != dumb ]]; then
-  green=$'\033[32m'; red=$'\033[31m'; yellow=$'\033[33m'; reset=$'\033[0m'
+fail() { printf '✗ %s\n' "$*" >&2; exit 1; }
+if [[ ${LLM_STACK_CONTAINER:-} == 1 ]]; then
+  exec python /app/bin/models.py "$@"
 fi
-die() { printf '%s✗ %s%s\n' "$red" "$*" "$reset" >&2; exit 1; }
-ok() { printf '%s✓ %s%s\n' "$green" "$*" "$reset"; }
-usage() {
-  printf '%s\n' 'LLM Stack · Models' 'Usage: bin/models list | add MODEL | remove MODEL | --help' 'Set COMPOSE_PROJECT_NAME to select a deployed stack.' 'Browse models: https://ollama.com/library'
-}
-cmd=${1:---help}
-case "$cmd" in
-  --help|-h|help) usage; exit 0 ;;
-  list) [[ $# == 1 ]] || die 'Usage: bin/models list' ;;
-  add|remove) [[ $# == 2 ]] || die "Usage: bin/models $cmd MODEL (include explicit tag)" ;;
-  *) usage; die "Unknown command: $cmd" ;;
+cd "$(dirname "$0")/.."
+case "${1:---help}" in
+  --help|-h|help) printf '%s\n' 'Usage: bin/models list | add MODEL | remove MODEL | --help'; exit 0 ;;
 esac
-if [[ "$cmd" != list ]]; then
-  model=$2
-  [[ "$model" =~ ^[a-zA-Z0-9][a-zA-Z0-9_./-]*:[a-zA-Z0-9][a-zA-Z0-9_.-]*$ ]] || die 'Use an explicit model tag, e.g. qwen3:4b.'
-fi
-for dependency in docker jq; do
-  command -v "$dependency" >/dev/null || die "Missing dependency: $dependency"
+command -v docker >/dev/null || fail 'Docker is not installed.'
+docker info >/dev/null 2>&1 || fail 'Docker is unavailable. Start Docker and check permissions.'
+docker compose version >/dev/null 2>&1 || fail 'Docker Compose v2 is required.'
+running=$(docker compose ps --status running --services) || fail 'Cannot inspect Compose project. Check .env and configuration.'
+for service in postgres ollama litellm; do
+  grep -qx "$service" <<<"$running" || fail "$service is not running. Run docker compose up -d."
 done
-docker info >/dev/null 2>&1 || die 'Docker is unavailable. Start Docker or check daemon permissions.'
-docker compose version >/dev/null 2>&1 || die 'Install Docker Compose v2.'
-root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-cd "$root"
-printf '%s\n' 'LLM Stack · Models'
-container() {
-  local service=$1 ids
-  if [[ -n ${COMPOSE_PROJECT_NAME:-} ]]; then
-    ids=$(docker ps -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" --filter "label=com.docker.compose.service=$service")
-  else
-    ids=$(docker compose ps -q --status running "$service") || return 1
-  fi
-  [[ -n "$ids" && "$ids" != *$'\n'* ]] || return 1
-  printf '%s' "$ids"
-}
-ollama=$(container ollama) || die 'Ollama container not running or ambiguous. Start with docker compose up -d or set COMPOSE_PROJECT_NAME.'
-lite=$(container litellm) || die 'LiteLLM container not running or ambiguous. Start the stack or check COMPOSE_PROJECT_NAME.'
-# Use the existing Python runtime inside LiteLLM. Credentials stay in the container.
-api() {
-  docker exec -i "$lite" python -c '
-import os, sys, urllib.request, urllib.error
-method, path = sys.argv[1:3]
-body = sys.stdin.buffer.read() if method == "POST" else None
-req = urllib.request.Request("http://127.0.0.1:4000" + path, data=body, method=method, headers={"Authorization": "Bearer " + os.environ["LITELLM_MASTER_KEY"], "Content-Type": "application/json"})
-try:
-    with urllib.request.urlopen(req, timeout=30) as response:
-        print(response.read().decode())
-except urllib.error.HTTPError as exc:
-    sys.exit("LiteLLM HTTP error: " + str(exc.code))
-except urllib.error.URLError:
-    sys.exit("LiteLLM API is unavailable")
-' "$1" "$2"
-}
-inventory() {
-  installed=$(docker exec "$ollama" ollama list) || die 'Ollama API unavailable.'
-  registered=$(api GET /model/info </dev/null) || die 'Cannot read LiteLLM model inventory; check API health and master key.'
-  jq -e '.data | type == "array"' <<<"$registered" >/dev/null || die 'Unexpected LiteLLM inventory response.'
-  local names
-  names=$(printf '%s\n' "$installed" | awk 'NR>1 {print $1}')
-  local_json=$(printf '%s\n' "$names" | jq -Rn '[inputs | select(length>0)]')
-}
-inventory
-case "$cmd" in
-  list)
-    printf '%-36s %-22s %s\n' MODEL OLLAMA LITELLM
-    while IFS=$'\t' read -r name local_state remote_state; do
-      [[ -n "$name" ]] || continue
-      lc=$yellow; rc=$yellow
-      [[ "$local_state" != Installed ]] || lc=$green
-      [[ "$remote_state" != Registered ]] || rc=$green
-      printf '%-36s %s%-22s%s %s%s%s\n' "$name" "$lc" "$local_state" "$reset" "$rc" "$remote_state" "$reset"
-    done < <(jq -nr --argjson l "$local_json" --argjson r "$registered" '
-      ($l + [$r.data[].model_name] | unique)[] as $n |
-      [$n, (if ($l|index($n)) != null then "Installed" else "Missing" end),
-      (if any($r.data[]; .model_name == $n and .litellm_params.model == ("ollama_chat/"+$n)) then "Registered" elif any($r.data[]; .model_name == $n) then "Other route" else "Missing" end)] | @tsv')
-    ;;
-  add)
-    routes=$(jq -c --arg m "$model" '[.data[] | select(.model_name==$m)]' <<<"$registered")
-    if jq -e 'length>0' <<<"$routes" >/dev/null; then
-      jq -e --arg m "$model" 'length==1 and .[0].litellm_params.model==("ollama_chat/"+$m) and .[0].litellm_params.api_base=="http://ollama:11434"' <<<"$routes" >/dev/null || die 'Name already used by a different or duplicate route.'
-    fi
-    if ! jq -e --arg m "$model" 'index($m)!=null' <<<"$local_json" >/dev/null; then
-      docker exec "$ollama" ollama pull "$model" || die 'Model download failed.'
-    fi
-    ok "Installed: $model"
-    if jq -e 'length==0' <<<"$routes" >/dev/null; then
-      jq -nc --arg m "$model" '{model_name:$m,litellm_params:{model:("ollama_chat/"+$m),api_base:"http://ollama:11434"}}' | api POST /model/new >/dev/null || die 'Registration failed. Model remains installed; rerun add to retry.'
-    fi
-    ok "Registered: $model"
-    ;;
-  remove)
-    routes=$(jq -c --arg m "$model" '[.data[] | select(.litellm_params.model==("ollama_chat/"+$m) or .litellm_params.model==("ollama/"+$m))]' <<<"$registered")
-    jq -e --arg m "$model" 'all(.[]; .model_name==$m and .litellm_params.api_base=="http://ollama:11434" and (.model_info.id|type=="string")) and length<=1' <<<"$routes" >/dev/null || die 'Model has aliases, duplicate routes or ambiguous metadata. Remove those manually first.'
-    jq -e --arg m "$model" 'all(.data[]; .model_name!=$m or (.litellm_params.model==("ollama_chat/"+$m) or .litellm_params.model==("ollama/"+$m)))' <<<"$registered" >/dev/null || die 'Name belongs to another route.'
-    [[ -t 0 ]] || die 'Removal requires interactive confirmation.'
-    printf 'Remove %s from LiteLLM and Ollama? [y/N] ' "$model"
-    read -r answer
-    [[ "$answer" == y || "$answer" == Y ]] || { printf 'Cancelled.\n'; exit 0; }
-    if jq -e 'length==1' <<<"$routes" >/dev/null; then
-      jq -c '.[0] | {id:.model_info.id}' <<<"$routes" | api POST /model/delete >/dev/null || die 'Registration removal failed; model weights retained.'
-      ok 'Registration removed'
-    fi
-    if jq -e --arg m "$model" 'index($m)!=null' <<<"$local_json" >/dev/null; then
-      docker exec "$ollama" ollama rm "$model" || die 'Weights remain installed; rerun remove to retry.'
-    fi
-    ok "Removed: $model"
-    ;;
-esac
+if [[ -t 0 && -t 1 ]]; then
+  exec docker compose exec litellm /app/bin/models "$@"
+else
+  exec docker compose exec -T litellm /app/bin/models "$@"
+fi
