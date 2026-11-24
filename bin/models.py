@@ -110,9 +110,36 @@ def doctor():
     return 1 if failed else 0
 
 
+def registered_routes():
+    # V1 can return HTTP 500 on a cold start with no registered models.
+    page = request("LiteLLM", "/v2/model/info?page=1&size=50")
+    total = page["total_count"]
+    if type(total) is not int or total < 0 or not isinstance(page["data"], list):
+        raise RuntimeError("Invalid LiteLLM inventory response.")
+    if total == 0:
+        if page["data"]:
+            raise RuntimeError("Inconsistent LiteLLM inventory response.")
+        return []
+    # V1 returns the full inventory and connection metadata; V2 may hide api_base.
+    routes = request("LiteLLM", "/model/info")["data"]
+    if not isinstance(routes, list) or len(routes) != total:
+        raise RuntimeError("LiteLLM inventory changed or is incomplete; retry.")
+    return routes
+
+def local_model(route):
+    p = params(route)
+    model = p.get("model", "")
+    if (p.get("api_base") or "").rstrip("/") != "http://ollama:11434":
+        return None
+    for prefix in ("ollama_chat/", "ollama/"):
+        if model.startswith(prefix):
+            tag = model[len(prefix):]
+            return tag if ":" in tag else tag + ":latest"
+    return None
+
 def inventory():
     names = {m["name"] for m in request("Ollama", "/api/tags")["models"]}
-    routes = request("LiteLLM", "/model/info")["data"]
+    routes = registered_routes()
     return names, routes
 
 def params(route):
@@ -145,19 +172,26 @@ def main():
     print(paint("LLM Stack · Models", 36), flush=True)
     installed, routes = inventory()
     if args.command == "list":
-        names = sorted(installed | {r["model_name"] for r in routes})
+        names = sorted(installed | {local_model(r) or r["model_name"] for r in routes})
         width = max([len("MODEL")] + [len(n) for n in names]) + 3
-        print(f"{'MODEL':<{width}} {'OLLAMA':<14} LITELLM")
+        print(f"{'MODEL':<{width}} {'OLLAMA':<14} LITELLM (public name)")
         for n in names:
             local = "Installed" if n in installed else "Missing"
-            remote = ("Registered" if any(matches(r, n) for r in routes)
-                      else "Other route" if any(r["model_name"] == n for r in routes) else "Missing")
-            print(f"{n:<{width}} {paint(f'{local:<14}', 32 if local == 'Installed' else 33)} {paint(remote, 32 if remote == 'Registered' else 33)}")
+            linked = [r for r in routes if local_model(r) == n]
+            other = [r for r in routes if local_model(r) is None and r["model_name"] == n]
+            remote = ("Registered: " + ", ".join(r["model_name"] for r in linked)
+                      if linked else "Other route" if other else "Missing")
+            if other and linked:
+                remote += " (name conflict)"
+            print(f"{n:<{width}} {paint(f'{local:<14}', 32 if local == 'Installed' else 33)} {paint(remote, 32 if remote.startswith('Registered:') else 33)}")
         if not names:
             print("No models. Browse https://ollama.com/library")
         return
     same = [r for r in routes if r["model_name"] == name]
     if args.command == "add":
+        aliases = [r for r in routes if local_model(r) == name and not matches(r, name)]
+        if aliases:
+            raise RuntimeError("Model already has a different route; manage its alias manually first.")
         if same and (len(same) != 1 or not matches(same[0], name)):
             raise RuntimeError("Name is already used by a different or duplicate route.")
         if name not in installed:
@@ -171,7 +205,7 @@ def main():
         ok("Registered: " + name)
         return
     references = [r for r in routes if params(r).get("model") in ("ollama_chat/" + name, "ollama/" + name, "ollama_chat/" + name.removesuffix(":latest"), "ollama/" + name.removesuffix(":latest"))]
-    if len(references) > 1 or any(not matches(r, name) for r in references) or any(not matches(r, name) for r in same):
+    if any(local_model(r) == name and not matches(r, name) for r in routes) or len(references) > 1 or any(not matches(r, name) for r in references) or any(not matches(r, name) for r in same):
         raise RuntimeError("Conflicting routes or aliases exist; manage them manually first.")
     if not same and name not in installed:
         ok("Already absent: " + name)
