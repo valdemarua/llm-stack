@@ -12,7 +12,7 @@ COLOR = sys.stdout.isatty() and "NO_COLOR" not in os.environ
 def paint(text, code):
     return f"\033[{code}m{text}\033[0m" if COLOR else text
 
-def request(service, path, method="GET", data=None, stream=False):
+def request(service, path, method="GET", data=None, stream=False, diagnostic=False):
     base = "http://ollama:11434" if service == "Ollama" else "http://127.0.0.1:4000"
     headers = {"Content-Type": "application/json"}
     if service == "LiteLLM":
@@ -40,11 +40,75 @@ def request(service, path, method="GET", data=None, stream=False):
                     raise RuntimeError("Ollama download did not complete.")
                 return
             body = response.read()
+            if diagnostic:
+                try:
+                    return response.status, json.loads(body) if body else None
+                except ValueError:
+                    return response.status, None
             return json.loads(body) if body else None
     except urllib.error.HTTPError as exc:
+        if diagnostic:
+            try:
+                body = json.loads(exc.read(65536))
+            except (ValueError, OSError):
+                body = None
+            return exc.code, body
         raise RuntimeError(f"{service} {path}: HTTP {exc.code}") from None
     except (OSError, urllib.error.URLError):
         raise RuntimeError(f"{service} is unavailable; check container health and logs.") from None
+
+def doctor():
+    """Probe endpoints independently; never print response secrets."""
+    probes = [
+        ("Ollama", "/api/tags"),
+        ("LiteLLM", "/health/liveliness"),
+        ("LiteLLM", "/health/readiness"),
+        ("LiteLLM", "/v1/models"),
+        ("LiteLLM", "/model/info"),
+        ("LiteLLM", "/v2/model/info"),
+        ("LiteLLM", "/model_group/info"),
+    ]
+    failed = False
+    print(paint("LLM Stack · Diagnostics", 36))
+    for service, path in probes:
+        label = f"{service} {path}"
+        try:
+            status, body = request(service, path, diagnostic=True)
+            success = 200 <= status < 300
+            failed |= not success
+            detail = ""
+            if isinstance(body, dict):
+                for field in ("models", "data"):
+                    if isinstance(body.get(field), list):
+                        detail = f" · {len(body[field])} entries"
+                        break
+                if type(body.get("total_count")) is int:
+                    detail += f" · total {body['total_count']}"
+                if not success:
+                    error = body.get("error", body.get("detail"))
+                    if isinstance(error, dict):
+                        error = error.get("message")
+                    # Only emit recognized diagnostic categories, never raw text.
+                    if isinstance(error, str):
+                        lower = error.lower()
+                        for pattern, category in (
+                            ("no models", "no models"),
+                            ("no model", "no model"),
+                            ("router", "router-related"),
+                            ("database", "database-related"),
+                            ("prisma", "database-related"),
+                            ("none", "null-related"),
+                            ("auth", "authentication-related"),
+                        ):
+                            if pattern in lower:
+                                detail += " · " + category
+                                break
+            print(f"{label:<34} {paint('HTTP ' + str(status), 32 if success else 31)}{detail}", flush=True)
+        except (RuntimeError, ValueError, OSError):
+            failed = True
+            print(f"{label:<34} {paint('Request failed', 31)}", flush=True)
+    return 1 if failed else 0
+
 
 def inventory():
     names = {m["name"] for m in request("Ollama", "/api/tags")["models"]}
@@ -66,9 +130,15 @@ def main():
     parser = argparse.ArgumentParser(prog="bin/models")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list")
+    commands.add_parser("doctor", help="Probe internal APIs without changing state")
     for command in ("add", "remove"):
         commands.add_parser(command).add_argument("model")
+    if len(sys.argv) == 1:
+        parser.print_help()
+        return
     args = parser.parse_args()
+    if args.command == "doctor":
+        sys.exit(doctor())
     name = getattr(args, "model", None)
     if name and not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_./-]*:[a-zA-Z0-9][a-zA-Z0-9_.-]*", name):
         parser.error("Use an explicit model tag, e.g. qwen3:4b.")
