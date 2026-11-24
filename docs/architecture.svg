@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600" viewBox="0 0 900 600" role="img" aria-labelledby="title desc">
+<title id="title">LLM Stack architecture</title>
+<desc id="desc">Applications use the OpenAI-compatible LiteLLM gateway, which routes inference to Ollama or optional cloud providers and stores gateway state in PostgreSQL.</desc>
+<defs>
+  <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#64748b"/></marker>
+  <marker id="cloud-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#b45309"/></marker>
+</defs>
+<rect x="1" y="1" width="898" height="598" rx="24" fill="#f8fafc" stroke="#e2e8f0"/>
+<g font-family="system-ui, -apple-system, Segoe UI, sans-serif" text-anchor="middle">
+  <rect x="32" y="24" width="836" height="122" rx="16" fill="#eef2f7" stroke="#cbd5e1"/>
+  <text x="450" y="51" font-size="12" font-weight="700" letter-spacing="2.5" fill="#475569">APPLICATION LAYER</text>
+  <g fill="#ffffff" stroke="#cbd5e1">
+    <rect x="74" y="69" width="220" height="54" rx="10"/>
+    <rect x="340" y="69" width="220" height="54" rx="10"/>
+    <rect x="606" y="69" width="220" height="54" rx="10"/>
+  </g>
+  <g fill="#334155" font-size="17" font-weight="600">
+    <text x="184" y="102">Web Apps</text><text x="450" y="102">Workers</text><text x="716" y="102">AI Agents</text>
+  </g>
+  <g stroke="#64748b" stroke-width="1.8" fill="none">
+    <path d="M184 123 V164 H450"/><path d="M716 123 V164 H450"/><path d="M450 123 V164"/>
+  </g>
+  <rect x="324" y="180" width="252" height="34" rx="17" fill="#334155"/>
+  <path d="M450 164 V180 M450 214 V302" stroke="#64748b" stroke-width="1.8" fill="none" marker-end="url(#arrow)"/>
+  <text x="450" y="202" font-size="13" font-weight="600" fill="#ffffff">OpenAI-compatible API</text>
+  <rect x="32" y="250" width="620" height="322" rx="18" fill="#ffffff" stroke="#94a3b8" stroke-width="1.4" stroke-dasharray="6 5"/>
+  <text x="52" y="276" text-anchor="start" font-size="12" font-weight="700" letter-spacing="1.6" fill="#64748b">LLM STACK / DOCKER COMPOSE</text>
+  <path d="M450 250 V302" stroke="#64748b" stroke-width="1.8" fill="none" marker-end="url(#arrow)"/>
+  <rect x="180" y="302" width="320" height="85" rx="14" fill="#f1eafe" stroke="#8b5cf6" stroke-width="1.7"/>
+  <text x="340" y="336" font-size="25" font-weight="700" fill="#6936c4">LiteLLM</text>
+  <text x="340" y="360" font-size="14" fill="#594578">API Gateway · Admin UI</text>
+  <g stroke="#64748b" stroke-width="1.8" fill="none">
+    <path d="M340 387 V415 H178 V464" marker-end="url(#arrow)"/>
+    <path d="M340 415 H506 V464" marker-end="url(#arrow)"/>
+  </g>
+  <text x="190" y="444" text-anchor="start" font-size="12" fill="#64748b">Inference</text>
+  <text x="494" y="444" text-anchor="end" font-size="12" fill="#64748b">State</text>
+  <rect x="58" y="464" width="240" height="82" rx="12" fill="#e6f8ef" stroke="#10b981" stroke-width="1.5"/>
+  <text x="178" y="497" font-size="23" font-weight="700" fill="#087c58">Ollama</text>
+  <text x="178" y="521" font-size="14" fill="#36695a">Local model inference</text>
+  <rect x="386" y="464" width="240" height="82" rx="12" fill="#eaf2ff" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="506" y="497" font-size="22" font-weight="700" fill="#245db1">PostgreSQL</text>
+  <text x="506" y="521" font-size="14" fill="#42618b">Keys · Configuration · State</text>
+  <path d="M500 344 H765 V464" stroke="#b45309" stroke-width="1.7" stroke-dasharray="6 5" fill="none" marker-end="url(#cloud-arrow)"/>
+  <rect x="680" y="464" width="188" height="82" rx="12" fill="#fff4df" stroke="#d97706" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="774" y="484" font-size="10" font-weight="700" letter-spacing="1.5" fill="#a16207">OPTIONAL</text>
+  <text x="774" y="508" font-size="18" font-weight="700" fill="#92400e">Cloud APIs</text>
+  <text x="774" y="528" font-size="12" fill="#925d26">External providers</text>
+</g>
+</svg>
