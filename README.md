@@ -45,6 +45,10 @@ The CLI combines Ollama downloads and LiteLLM registration. The local Bash wrapp
 ```sh
 chmod +x bin/models
 bin/models list
+bin/models search
+bin/models search --all
+bin/models search qwen
+bin/models tags qwen3
 bin/models add qwen3:4b
 bin/models remove qwen3:4b
 bin/models --help
@@ -60,6 +64,10 @@ qwen3:8b                             Installed              Missing
 ```
 
 The CLI checks Docker availability, running containers and the authenticated gateway inventory. Add uses explicit tags and registers chat models with their original names. Retrying add repairs a missing registration. Remove requires confirmation and refuses known aliases, duplicate routes or ambiguous registrations. Run management operations serially; do not edit routes concurrently in the UI. Custom providers and aliases should be managed manually. Set NO_COLOR=1 to disable terminal colors.
+
+### Browse available models
+
+`search` filters public Ollama search results to selected developer families in `bin/catalog.json`. `search --all` expands discovery by querying known family prefixes (not the entire registry). `search qwen` filters by name; `tags qwen3` shows explicit tags and download sizes where available. Discovery is read-only, uses Python's standard library and requires outbound HTTPS from LiteLLM, not the internal model APIs. It does not download weights. The public HTML catalog may truncate results or change layout; completeness, license and local compatibility are not guaranteed. Add new family prefixes to the JSON file as needed. Cloud-only entries are filtered heuristically; check the model page before installation. No cache or extra service is required.
 
 ### Dokploy terminal usage
 

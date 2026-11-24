@@ -3,3 +3,5 @@
 !bin/
 !bin/models
 !bin/models.py
+!bin/model_catalog.py
+!bin/catalog.json

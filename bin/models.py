@@ -7,6 +7,7 @@ import re
 import sys
 import urllib.request
 import urllib.error
+import model_catalog
 
 COLOR = sys.stdout.isatty() and "NO_COLOR" not in os.environ
 def paint(text, code):
@@ -154,16 +155,25 @@ def ok(message):
     print(paint("✓ " + message, 32))
 
 def main():
-    parser = argparse.ArgumentParser(prog="bin/models")
+    parser = argparse.ArgumentParser(prog="bin/models", description="Discover, install and manage local Ollama chat models.", epilog="Examples: bin/models search qwen; bin/models tags qwen3; bin/models add qwen3:4b")
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("list")
+    commands.add_parser("list", help="Show installed models and gateway registrations")
+    search = commands.add_parser("search", help="Browse selected developers in the public Ollama catalog", description="Browse public search results for selected model developers. --all queries known family prefixes for broader coverage.")
+    search.add_argument("query", nargs="?", help="Filter by model name")
+    search.add_argument("--all", action="store_true", help="Expand search across known families, not the entire Ollama registry")
+    tags = commands.add_parser("tags", help="Show downloadable model tags and file sizes")
+    tags.add_argument("family", help="Library model name, e.g. qwen3")
     commands.add_parser("doctor", help="Probe internal APIs without changing state")
     for command in ("add", "remove"):
-        commands.add_parser(command).add_argument("model")
+        commands.add_parser(command, help={"add": "Download and register an explicit chat model tag", "remove": "Unregister and delete a model after confirmation"}[command]).add_argument("model", help="Explicit tag, e.g. qwen3:4b")
     if len(sys.argv) == 1:
         parser.print_help()
         return
     args = parser.parse_args()
+    if args.command == "search":
+        return model_catalog.search(args.query, args.all)
+    if args.command == "tags":
+        return model_catalog.tags(args.family)
     if args.command == "doctor":
         sys.exit(doctor())
     name = getattr(args, "model", None)

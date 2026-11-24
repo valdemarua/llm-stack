@@ -1,0 +1,46 @@
+{
+  "OpenAI": [
+    "gpt-oss"
+  ],
+  "Meta": [
+    "llama",
+    "muse-glimmer"
+  ],
+  "Google": [
+    "gemma",
+    "translategemma"
+  ],
+  "Alibaba": [
+    "qwen",
+    "qwq"
+  ],
+  "DeepSeek": [
+    "deepseek"
+  ],
+  "Mistral AI": [
+    "mistral",
+    "mixtral",
+    "devstral",
+    "codestral",
+    "magistral",
+    "pixtral"
+  ],
+  "Microsoft": [
+    "phi"
+  ],
+  "IBM": [
+    "granite"
+  ],
+  "NVIDIA": [
+    "nemotron"
+  ],
+  "Moonshot AI": [
+    "kimi"
+  ],
+  "Z.ai": [
+    "glm"
+  ],
+  "MiniMax": [
+    "minimax"
+  ]
+}

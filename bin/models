@@ -6,13 +6,31 @@ if [[ ${LLM_STACK_CONTAINER:-} == 1 ]]; then
 fi
 cd "$(dirname "$0")/.."
 case "${1:---help}" in
-  --help|-h|help) printf '%s\n' 'Usage: bin/models list | add MODEL | remove MODEL | --help'; exit 0 ;;
+  --help|-h|help)
+    cat <<'HELP'
+Usage: bin/models COMMAND [OPTIONS]
+
+  list                Show installed models and gateway registrations
+  search [QUERY]      Browse selected developers in Ollama's public catalog
+  search --all        Expand search across known model families
+  tags MODEL          Show downloadable tags and file sizes
+  add MODEL:TAG       Download and register a chat model
+  remove MODEL:TAG    Unregister and delete after confirmation
+  doctor              Probe internal APIs without changing state
+
+Use bin/models COMMAND --help for command-specific options.
+Examples: bin/models search qwen; bin/models tags qwen3
+HELP
+    exit 0 ;;
 esac
 command -v docker >/dev/null || fail 'Docker is not installed.'
 docker info >/dev/null 2>&1 || fail 'Docker is unavailable. Start Docker and check permissions.'
 docker compose version >/dev/null 2>&1 || fail 'Docker Compose v2 is required.'
 running=$(docker compose ps --status running --services) || fail 'Cannot inspect Compose project. Check .env and configuration.'
-for service in postgres ollama litellm; do
+services=(postgres ollama litellm)
+case "$1" in search|tags|doctor) services=(litellm) ;; esac
+if [[ ${2:-} == --help || ${2:-} == -h ]]; then services=(litellm); fi
+for service in "${services[@]}"; do
   grep -qx "$service" <<<"$running" || fail "$service is not running. Run docker compose up -d."
 done
 if [[ -t 0 && -t 1 ]]; then
