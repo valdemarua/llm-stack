@@ -6,7 +6,7 @@ A portable, self-contained Docker Compose stack for local LLM inference and a un
 ## Guidelines
 - Keep the stack minimal, CPU-first and hosting-agnostic. Dokploy is an optional deployment target.
 - Prefer official images with explicit version tags; verify upstream releases and security advisories before updating.
-- Keep PostgreSQL and Ollama private. Expose only LiteLLM; require authentication and TLS for remote access.
+- Keep PostgreSQL and Ollama unpublished and off shared proxy networks. Keep LiteLLM host publishing fixed to loopback; require authentication and TLS for remote access. Preserve explicit project-scoped networking and no-new-privileges. For Dokploy, use Isolated Deployments and native domain routing to container port 4000.
 - Never commit credentials, real infrastructure addresses, or database dumps. Keep .env.example synchronized with Compose.
 - Preserve named volumes and encryption secrets across deployments. Document migrations and backup/restore changes.
 - Keep business logic, prompts and project-specific model choices outside this repository.
