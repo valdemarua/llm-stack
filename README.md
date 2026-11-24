@@ -40,7 +40,7 @@ Cloud models can be added separately through the UI. Model weights are not downl
 
 ## Dokploy
 
-Create a Compose application from this repository with compose.yaml. Set the required secrets in the Environment UI. Configure a TLS domain targeting litellm on container port 4000. Keep the default loopback host binding; the reverse proxy should reach the container over its network. Deploy and use Dokploy's container terminal to pull models. Register models and generate keys in LiteLLM UI.
+Create a Compose application from this repository with docker-compose.yml. Set the required secrets in the Environment UI. Configure a TLS domain targeting litellm on container port 4000. Keep the default loopback host binding; the reverse proxy should reach the container over its network. Deploy and use Dokploy's container terminal to pull models. Register models and generate keys in LiteLLM UI.
 
 ## Backup and restore
 
