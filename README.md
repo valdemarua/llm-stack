@@ -38,6 +38,21 @@ curl http://localhost:4000/v1/chat/completions \
 
 Cloud models can be added separately through the UI. Model weights are not downloaded automatically.
 
+## Client integration
+
+Use the gateway URL with the `/v1` suffix (for example, `https://llm.example.com/v1`), a dedicated virtual key, and the public model name. Create one key per application and restrict its allowed models. Never distribute the master key or upstream provider credentials.
+
+In Models + Endpoints, add the desired OpenAI model using your upstream API key. Give it a public model name and grant the application virtual key access to it. Clients use the same gateway URL and virtual key for local and cloud models; only the model parameter changes. Cloud requests remain billable by the upstream provider. Set appropriate spending and rate limits and validate the API features your application uses.
+
+List allowed models with:
+
+```sh
+curl https://llm.example.com/v1/models \
+  -H "Authorization: Bearer $LLM_API_KEY"
+```
+
+Public Swagger, ReDoc and OpenAPI schema are disabled by default via NO_DOCS, NO_REDOC and NO_OPENAPI. Set the corresponding variables to False and redeploy if documentation is needed. The admin UI remains at /ui. Hiding documentation is not an authentication control. After deployment, verify that the documentation is hidden, the admin UI works, authenticated inference succeeds and unauthenticated inference is denied.
+
 ## Model management
 
 The CLI combines Ollama downloads and LiteLLM registration. The local Bash wrapper validates Docker and delegates to a single Python implementation bundled in the LiteLLM image. No host Python, jq or native Ollama installation is needed.

@@ -53,6 +53,9 @@ services:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?Set LITELLM_MASTER_KEY}
       LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?Set LITELLM_SALT_KEY}
       STORE_MODEL_IN_DB: "True"
+      NO_DOCS: "${NO_DOCS:-True}"
+      NO_REDOC: "${NO_REDOC:-True}"
+      NO_OPENAPI: "${NO_OPENAPI:-True}"
     command: ["--port", "4000"]
     ports:
       - "127.0.0.1:${LITELLM_PORT:-4000}:4000"
